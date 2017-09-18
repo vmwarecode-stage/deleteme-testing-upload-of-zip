@@ -1,0 +1,7 @@
+*~
+\#*
+build/
+dist/
+src/vpoller.egg-info/
+_build
+venv/*

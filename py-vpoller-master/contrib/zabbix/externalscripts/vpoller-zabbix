@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# Simple wrapper script to use with Zabbix helper
+
+# A POSIX variable
+OPTIND=1         # Reset in case getopts has been used previously in the shell.
+
+# Initialize our own variables:
+whitespace="[[:space:]]"
+_vsphere=
+normal=`echo $@ | grep -E "(cluster.get|datacenter.get)" | wc -l`
+
+if [ $normal -ne 0 ]
+then
+  _args=''
+
+  ### Process command line with spaces in
+  for i in "$@"
+  do
+    if [[ $i =~ $whitespace ]]
+    then
+       _args="${_args} \"$i\""
+    else
+       _args="${_args} $i"
+    fi
+  done
+else
+  _args="$@"
+fi
+
+### Processing opts to retrieve vSphere host
+while getopts "hvDm:n:p:r:t:e:V:k:U:P:o:H:" opt
+do
+    case "${opt}" in
+    V)  _vsphere=$OPTARG ;;
+    esac
+done
+shift $((OPTIND-1))
+
+### Detect if vcenter SDK is available
+_url="https://${_vsphere}/sdk"
+_curl_bin=`which curl`
+_curl_options="--connect-timeout 3 -k"
+
+if [ ! -f $_curl_bin ]
+then
+  echo "ZBX_NOTSUPPORTED no curl"
+  exit 1
+fi
+
+${_curl_bin} ${_curl_options} ${_url} > /dev/null 2>&1
+
+if [ $? -ne 0 ]
+then
+  echo "ZBX_NOTSUPPORTED no SDK"
+  exit 1
+fi
+
+### Detect if vpoller proxy is working:
+### Disable this check if the proxy is not running on this host or change the url"
+if [ -f /usr/bin/vpoller-proxy ]
+then
+  _running=`/usr/bin/vpoller-proxy -e tcp://localhost:9999 status | grep -w running | wc -l`
+
+  if [ $_running -eq 0 ]
+  then
+    echo "ZBX_NOTSUPPORTED no vpoller proxy"
+    exit 1
+  fi
+fi
+
+### Excute the vpoller-client
+if [ $normal -ne 0 ]
+then
+  bash -c "vpoller-client -H vpoller.helpers.zabbix ${_args}" | awk '{print $1;}'
+else
+  vpoller-client -H vpoller.helpers.zabbix ${_args}
+fi

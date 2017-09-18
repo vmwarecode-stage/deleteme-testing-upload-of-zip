@@ -1,0 +1,56 @@
+#!/sbin/runscript
+# Copyright 1999-2012 Gentoo Foundation
+# Distributed under the terms of the GNU General Public License v2
+
+. /etc/init.d/functions.sh
+
+extra_commands="fullstatus"
+
+description_fullstatus="Gives the full status of the server."
+
+depend() {
+	use logger net
+  after vpoller-proxy
+}
+
+checkconfig() {
+    checkpath --directory -m 0755 -o ${USER}:${GROUP} ${PID_DIR}
+    checkpath --directory -m 0755 -o ${USER}:${GROUP} ${LOG_DIR}
+}
+
+start() {
+  checkconfig || return 1
+
+  ebegin "Starting ${DESC}"
+  if [ ! -d ${CONF_DIR} ]; then
+    eend 1 "${CONF_DIR} does not exist"
+    return 1
+  fi
+  if [ ! -f ${CONF_FILE} ]; then
+    eend 1 "${CONF_FILE} does not exist"
+    return 1
+  fi
+#  if [ -f ${PID_FILE} ]; then
+#    rm ${PID_FILE}
+#  fi
+
+#  $DAEMON -d start >/dev/null 2>&1
+  start-stop-daemon --start --quiet \
+    --pidfile "${PID_FILE}" \
+    --user ${USER} --group ${GROUP} \
+    --exec ${DAEMON} -- \
+    -d start
+  eend $?
+}
+
+stop() {
+  ebegin "Stopping ${DESC}"
+#  ${DAEMON} -e ${MGMT_INTERFACE} stop >/dev/null 2>&1
+  start-stop-daemon --stop --pidfile ${PID_FILE}
+  eend
+}
+
+fullstatus() {
+  ${DAEMON} -e ${MGMT_INTERFACE} status
+}
+
